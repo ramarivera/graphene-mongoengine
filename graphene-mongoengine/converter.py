@@ -1,5 +1,6 @@
-from singledispatch import singledispatch
+""" Contains conversion logic between Mongoengine Fields and Graphene Types """
 
+from singledispatch import singledispatch
 
 from graphene import (
     String, Boolean, Int, Float, List,
@@ -7,12 +8,17 @@ from graphene import (
 )
 
 from graphene.types.json import JSONString
+from graphene.types.datetime import DateTime
 
 from mongoengine.fields import (
+    # Done
     ObjectIdField,
     BooleanField, StringField, IntField, LongField, FloatField, DecimalField,
-    URLField, EmailField, SequenceField, UUIDField,
+    URLField, EmailField, 
     DateTimeField, ComplexDateTimeField,
+    
+    # Todo
+    SequenceField, UUIDField,
     EmbeddedDocumentField,
     DynamicField,
     ListField, SortedListField,  DictField, MapField,
@@ -30,132 +36,87 @@ from mongoengine.fields import (
 
 from .fields import createConnectionField
 
-try:
-    from sqlalchemy_utils import (
-        ChoiceType, JSONType, ScalarListType, TSVectorType)
-except ImportError:
-    ChoiceType = JSONType = ScalarListType = TSVectorType = object
+from .utils import (
+    get_field_description, is_field_required
+)
 
+# pylint: disable=W0622
 
-def convert_sqlalchemy_relationship(relationship, registry):
-    direction = relationship.direction
-    model = relationship.mapper.entity
+# def convert_sqlalchemy_relationship(relationship, registry):
+#     direction = relationship.direction
+#     model = relationship.mapper.entity
 
-    def dynamic_type():
-        _type = registry.get_type_for_model(model)
-        if not _type:
-            return None
-        if direction == interfaces.MANYTOONE or not relationship.uselist:
-            return Field(_type)
-        elif direction in (interfaces.ONETOMANY, interfaces.MANYTOMANY):
-            if _type._meta.connection:
-                return createConnectionField(_type)
-            return Field(List(_type))
+#     def dynamic_type():
+#         _type = registry.get_type_for_model(model)
+#         if not _type:
+#             return None
+#         if direction == interfaces.MANYTOONE or not relationship.uselist:
+#             return Field(_type)
+#         elif direction in (interfaces.ONETOMANY, interfaces.MANYTOMANY):
+#             if _type._meta.connection:
+#                 return createConnectionField(_type)
+#             return Field(List(_type))
 
-    return Dynamic(dynamic_type)
-
-
-def convert_sqlalchemy_composite(composite, registry):
-    converter = registry.get_converter_for_composite(composite.composite_class)
-    if not converter:
-        try:
-            raise Exception(
-                "Don't know how to convert the composite field %s (%s)" %
-                (composite, composite.composite_class))
-        except AttributeError:
-            # handle fields that are not attached to a class yet (don't have a parent)
-            raise Exception(
-                "Don't know how to convert the composite field %r (%s)" %
-                (composite, composite.composite_class))
-    return converter(composite, registry)
-
-
-def _register_composite_class(cls, registry=None):
-    if registry is None:
-        from .registry import get_global_registry
-        registry = get_global_registry()
-
-    def inner(fn):
-        registry.register_composite_converter(cls, fn)
-    return inner
-
-
-convert_sqlalchemy_composite.register = _register_composite_class
+#     return Dynamic(dynamic_type)
 
 
 def convert_mongoengine_field(field, registry=None):
+    """ Shorcut method to :convert_mongoengine_type: """
     return convert_mongoengine_type(field.__class__, field, registry)
 
+def get_data_from_field(field):
+    """ Extracts Field data for Graphene type construction """
+    return {
+        'description': get_field_description(field),
+        'required': is_field_required(field)
+    }
 
 @singledispatch
 def convert_mongoengine_type(type, field, registry=None):
-    raise Exception(
-        "Don't know how to convert the Mongoengine field %s (%s)" % (field, type))
+    """ Generic Mongoengine Field to Graphene Type converter """
+    raise Exception(f"Don't know how to convert the Mongoengine field {field} ({type})")
 
+
+@convert_mongoengine_type.register(ObjectIdField)
+def convert_field_to_id(type, field, registry=None):
+    """ Converts Mongoengine fields to Graphene ID type """
+    return ID(**get_data_from_field(field))
 
 @convert_mongoengine_type.register(StringField)
 @convert_mongoengine_type.register(URLField)
 @convert_mongoengine_type.register(EmailField)
-def convert_column_to_string(type, column, registry=None):
-    return String(description=get_column_doc(column),
-                  required=not(is_column_nullable(column)))
+def convert_field_to_string(type, field, registry=None):
+    """ Converts Mongoengine fields to Graphene String type """
+    return String(**get_data_from_field(field))
 
 
 @convert_mongoengine_type.register(DateTimeField)
 @convert_mongoengine_type.register(ComplexDateTimeField)
-def convert_column_to_datetime(type, column, registry=None):
-    from graphene.types.datetime import DateTime
-    return DateTime(description=get_column_doc(column),
-                    required=not(is_column_nullable(column)))
+def convert_field_to_datetime(type, field, registry=None):
+    """ Converts Mongoengine fields to Graphene DateTime type """
+    return DateTime(**get_data_from_field(field))
 
 
-@convert_mongoengine_type.register(types.SmallInteger)
-@convert_mongoengine_type.register(types.Integer)
-def convert_column_to_int_or_id(type, column, registry=None):
-    if column.primary_key:
-        return ID(description=get_column_doc(column), required=not (is_column_nullable(column)))
-    else:
-        return Int(description=get_column_doc(column),
-                   required=not (is_column_nullable(column)))
+@convert_mongoengine_type.register(IntField)
+@convert_mongoengine_type.register(LongField)
+def convert_field_to_int_or_id(type, field, registry=None):
+    """ Converts Mongoengine fields to Graphene Int type """
+    return Int(**get_data_from_field(field))
 
 
-@convert_mongoengine_type.register(types.Boolean)
-def convert_column_to_boolean(type, column, registry=None):
-    return Boolean(description=get_column_doc(column), required=not(is_column_nullable(column)))
+@convert_mongoengine_type.register(BooleanField)
+def convert_field_to_boolean(type, field, registry=None):
+    """ Converts Mongoengine fields to Graphene Boolean type """
+    return Boolean(**get_data_from_field(field))
 
 
-@convert_mongoengine_type.register(types.Float)
-@convert_mongoengine_type.register(types.Numeric)
-@convert_mongoengine_type.register(types.BigInteger)
-def convert_column_to_float(type, column, registry=None):
-    return Float(description=get_column_doc(column), required=not(is_column_nullable(column)))
+@convert_mongoengine_type.register(FloatField)
+@convert_mongoengine_type.register(DecimalField)
+def convert_field_to_float(type, field, registry=None):
+    """ Converts Mongoengine fields to Graphene Float type """
+    return Float(**get_data_from_field(field))
 
 
-@convert_mongoengine_type.register(ChoiceType)
-def convert_column_to_enum(type, column, registry=None):
-    name = '{}_{}'.format(column.table.name, column.name).upper()
-    return Enum(name, type.choices, description=get_column_doc(column))
-
-
-@convert_mongoengine_type.register(ScalarListType)
-def convert_scalar_list_to_list(type, column, registry=None):
-    return List(String, description=get_column_doc(column))
-
-
-@convert_mongoengine_type.register(postgresql.ARRAY)
-def convert_postgres_array_to_list(_type, column, registry=None):
-    graphene_type = convert_mongoengine_type(column.type.item_type, column)
-    inner_type = type(graphene_type)
-    return List(inner_type, description=get_column_doc(column), required=not(is_column_nullable(column)))
-
-
-@convert_mongoengine_type.register(postgresql.HSTORE)
-@convert_mongoengine_type.register(postgresql.JSON)
-@convert_mongoengine_type.register(postgresql.JSONB)
-def convert_json_to_string(type, column, registry=None):
-    return JSONString(description=get_column_doc(column), required=not(is_column_nullable(column)))
-
-
-@convert_mongoengine_type.register(JSONType)
-def convert_json_type_to_string(type, column, registry=None):
-    return JSONString(description=get_column_doc(column), required=not(is_column_nullable(column)))
+# @convert_mongoengine_type.register(ScalarListType)
+# def convert_scalar_list_to_list(type, column, registry=None):
+#     return List(String, description=get_column_doc(column))

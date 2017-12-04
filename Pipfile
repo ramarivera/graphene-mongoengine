@@ -12,6 +12,8 @@ graphene = "*"
 singledispatch = "*"
 "flake8" = "*"
 pylint = "*"
+sqlalchemy = "*"
+rope = "*"
 
 
 [dev-packages]

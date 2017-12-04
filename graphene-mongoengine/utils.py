@@ -1,65 +1,47 @@
-from sqlalchemy.exc import ArgumentError
-from sqlalchemy.orm import class_mapper, object_mapper
-from sqlalchemy.orm.exc import UnmappedClassError, UnmappedInstanceError
+""" Utils for MongoEngine integration with Graphene """
 
+from mongoengine.document import (
+    Document, DynamicDocument,
+    EmbeddedDocument, DynamicEmbeddedDocument
+)
 
-def get_session(context):
-    return context.get('session')
-
-
-def get_query(model, context):
-    query = getattr(model, 'query', None)
+def get_query(document, context, queryset_attr='objects'):
+    query = getattr(document, queryset_attr, None)
     if not query:
-        session = get_session(context)
-        if not session:
-            raise Exception('A query in the model Base or a session in the schema is required for querying.\n'
-                            'Read more http://graphene-python.org/docs/sqlalchemy/tips/#querying')
-        query = session.query(model)
+        # session = get_session(context)
+        # if not session:
+        raise Exception('A queryset in the document is required for querying.')
     return query
 
 
-def is_mapped_class(cls):
-    try:
-        class_mapper(cls)
-    except (ArgumentError, UnmappedClassError):
-        return False
-    else:
-        return True
-
-
-def is_mapped_instance(cls):
-    try:
-        object_mapper(cls)
-    except (ArgumentError, UnmappedInstanceError):
-        return False
-    else:
-        return True
-
-class DocumentInspectionData:
-    
-    def __init__(self, document):
-        self.collection = ''
-        self.document_type = document.__class__
-
-        self._process_fields(get_document_fields(document))
-
-    def _process_fields(self, document_fields):
-        pass
-        
-
 def get_document_fields(document):
+    """ Returns a dict with a :Document: fields,
+    which keys are the Fields name as defined in the Document """
     return getattr(document, '_fields', {})
 
-
-def inspect_mongoengine_document(document):
-    return DocumentInspectionData(document)
+def is_mongoengine_document(document):
+    """ Checks whether document is a MongoEngine document """
+    document_classes = (
+        Document, EmbeddedDocument,
+        DynamicDocument, DynamicEmbeddedDocument
+    )
+    return isinstance(document, document_classes)
 
 def is_field_required(field):
-    pass
+    """ Returns true if the field is required (e.g. not nullable) """
+    return field.required
 
 def is_field_nullable(field):
-    pass
+    """ Returns true if the field is nullable"""
+    return not is_field_required(field)
 
 def get_field_type(field):
-    pass
+    """ Gets field type """
+    return field.__class__
+
+def get_field_description(field, description_keyword='description'):
+    """ Gets field description if available, using the description_keyword"""
+    return getattr(field, description_keyword, '')
+
+
 
