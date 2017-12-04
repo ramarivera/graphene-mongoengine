@@ -28,6 +28,8 @@ def construct_fields(document, registry, only_fields, exclude_fields):
             continue
 
         converted_field = convert_mongoengine_field(field, registry)
+
+        print(name)
         fields[name] = converted_field
 
     # # Get all the columns for the relationships on the model
@@ -113,7 +115,7 @@ class MongoEngineObjectType(ObjectType):
         if not is_mongoengine_document(root):
             raise Exception(f'Received incompatible instance "{root}".')
 
-        return isinstance(root, cls._meta.model)
+        return isinstance(root, cls._meta.document)
 
     @classmethod
     def get_query(cls, info):

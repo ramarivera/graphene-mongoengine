@@ -50,6 +50,7 @@ setup(
     ],
     tests_require=[
         'pytest>=2.7.2',
-        'mock'
+        'mock',
+        'mongomock'
     ],
 )

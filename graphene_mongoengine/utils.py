@@ -1,5 +1,7 @@
 """ Utils for MongoEngine integration with Graphene """
 
+import inspect
+
 from mongoengine.document import (
     Document, DynamicDocument,
     EmbeddedDocument, DynamicEmbeddedDocument
@@ -7,7 +9,7 @@ from mongoengine.document import (
 
 def get_query(document, context, queryset_attr='objects'):
     query = getattr(document, queryset_attr, None)
-    if not query:
+    if query is None:
         # session = get_session(context)
         # if not session:
         raise Exception('A queryset in the document is required for querying.')
@@ -25,7 +27,11 @@ def is_mongoengine_document(document):
         Document, EmbeddedDocument,
         DynamicDocument, DynamicEmbeddedDocument
     )
-    return isinstance(document, document_classes)
+    if not inspect.isclass(document):
+        document_class = document.__class__
+    else:
+        document_class = document
+    return issubclass(document_class, document_classes)
 
 def is_field_required(field):
     """ Returns true if the field is required (e.g. not nullable) """

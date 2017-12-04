@@ -34,7 +34,7 @@ from mongoengine.fields import (
     MultiPointField, MultiLineStringField, MultiPolygonField,  GeoJsonBaseField
 )
 
-from .fields import createConnectionField
+from .fields import create_connection_field
 
 from .utils import (
     get_field_description, is_field_required
@@ -62,7 +62,7 @@ from .utils import (
 
 def convert_mongoengine_field(field, registry=None):
     """ Shorcut method to :convert_mongoengine_type: """
-    return convert_mongoengine_type(field.__class__, field, registry)
+    return convert_mongoengine_type(field, registry)
 
 def get_data_from_field(field):
     """ Extracts Field data for Graphene type construction """
@@ -72,47 +72,48 @@ def get_data_from_field(field):
     }
 
 @singledispatch
-def convert_mongoengine_type(type, field, registry=None):
+def convert_mongoengine_type(field, registry=None):
     """ Generic Mongoengine Field to Graphene Type converter """
     raise Exception(f"Don't know how to convert the Mongoengine field {field} ({type})")
 
 
 @convert_mongoengine_type.register(ObjectIdField)
-def convert_field_to_id(type, field, registry=None):
+def convert_field_to_id(field, registry=None):
     """ Converts Mongoengine fields to Graphene ID type """
     return ID(**get_data_from_field(field))
+
 
 @convert_mongoengine_type.register(StringField)
 @convert_mongoengine_type.register(URLField)
 @convert_mongoengine_type.register(EmailField)
-def convert_field_to_string(type, field, registry=None):
+def convert_field_to_string(field, registry=None):
     """ Converts Mongoengine fields to Graphene String type """
     return String(**get_data_from_field(field))
 
 
 @convert_mongoengine_type.register(DateTimeField)
 @convert_mongoengine_type.register(ComplexDateTimeField)
-def convert_field_to_datetime(type, field, registry=None):
+def convert_field_to_datetime(field, registry=None):
     """ Converts Mongoengine fields to Graphene DateTime type """
     return DateTime(**get_data_from_field(field))
 
 
 @convert_mongoengine_type.register(IntField)
 @convert_mongoengine_type.register(LongField)
-def convert_field_to_int_or_id(type, field, registry=None):
+def convert_field_to_int_or_id(field, registry=None):
     """ Converts Mongoengine fields to Graphene Int type """
     return Int(**get_data_from_field(field))
 
 
 @convert_mongoengine_type.register(BooleanField)
-def convert_field_to_boolean(type, field, registry=None):
+def convert_field_to_boolean(field, registry=None):
     """ Converts Mongoengine fields to Graphene Boolean type """
     return Boolean(**get_data_from_field(field))
 
 
 @convert_mongoengine_type.register(FloatField)
 @convert_mongoengine_type.register(DecimalField)
-def convert_field_to_float(type, field, registry=None):
+def convert_field_to_float(field, registry=None):
     """ Converts Mongoengine fields to Graphene Float type """
     return Float(**get_data_from_field(field))
 
