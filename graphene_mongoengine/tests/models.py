@@ -1,60 +1,56 @@
-from __future__ import absolute_import
 
-from sqlalchemy import Column, Date, ForeignKey, Integer, String, Table
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import mapper, relationship
+from mongoengine import (
+    Document, EmbeddedDocument, DynamicEmbeddedDocument, DynamicDocument,
+    StringField, IntField, BooleanField, DateTimeField,
+    ListField, DictField,
+    EmbeddedDocumentField
+)
 
-Base = declarative_base()
+class Crontab(EmbeddedDocument):
 
-association_table = Table('association', Base.metadata,
-                          Column('pet_id', Integer, ForeignKey('pets.id')),
-                          Column('reporter_id', Integer, ForeignKey('reporters.id')))
-
-
-class Editor(Base):
-    __tablename__ = 'editors'
-    editor_id = Column(Integer(), primary_key=True)
-    name = Column(String(100))
+    minute = StringField(default='*', required=True, description='CRON minute expression')
+    hour = StringField(default='*', required=True, description='CRON hour expression')
+    day_of_week = StringField(default='*', required=True, description='CRON da of week expression')
+    day_of_month = StringField(default='*', required=True, description='CRON day of month expression')
+    month_of_year = StringField(default='*', required=True, description='CRON month expression')
 
 
-class Pet(Base):
-    __tablename__ = 'pets'
-    id = Column(Integer(), primary_key=True)
-    name = Column(String(30))
-    reporter_id = Column(Integer(), ForeignKey('reporters.id'))
+class Interval(EmbeddedDocument):
+    
+    PERIODS = ('days', 'hours', 'minutes', 'seconds', 'microseconds')
+
+    every = IntField(min_value=0, default=0, required=True, description='Interval value')
+    period = StringField(choices=PERIODS, description='Interval period')
 
 
-class Reporter(Base):
-    __tablename__ = 'reporters'
-    id = Column(Integer(), primary_key=True)
-    first_name = Column(String(30))
-    last_name = Column(String(30))
-    email = Column(String())
-    pets = relationship('Pet', secondary=association_table, backref='reporters')
-    articles = relationship('Article', backref='reporter')
-    favorite_article = relationship("Article", uselist=False)
-
-    # total = column_property(
-    #     select([
-    #         func.cast(func.count(PersonInfo.id), Float)
-    #     ])
-    # )
+class PeriodicTask(DynamicDocument):
+    """mongo database model that represents a periodic task"""
 
 
-class Article(Base):
-    __tablename__ = 'articles'
-    id = Column(Integer(), primary_key=True)
-    headline = Column(String(100))
-    pub_date = Column(Date())
-    reporter_id = Column(Integer(), ForeignKey('reporters.id'))
+    name = StringField(unique=True, required=True, description='Periodic Task name')
+    task = StringField(required=True, description='Task to execute with provided arguments')
+    description = StringField(description='Task description')
 
+    enabled = BooleanField(default=False, description='Whether the scheduled task should run when the conditions are met')
 
-class ReflectedEditor(type):
-    """Same as Editor, but using reflected table."""
-    @classmethod
-    def __subclasses__(cls):
-        return []
+    interval = EmbeddedDocumentField(Interval, description='Interval based schedule')
+    crontab = EmbeddedDocumentField(Crontab, description='Cron expression schedule')
 
-editor_table = Table('editors', Base.metadata, autoload=True)
+    args = ListField(description='List of task arguments (*args)')
+    kwargs = DictField(description='Dict with task keyword arguments (**kwargs)')
 
-mapper(ReflectedEditor, editor_table)
+    queue = StringField(description='Queue to execute the task on?')
+    exchange = StringField(description='')
+    routing_key = StringField(description='Task routing key')
+    soft_time_limit = IntField(description='')
+
+    expires = DateTimeField(description='Date when the task expires (no longer ticks)')
+    start_after = DateTimeField(description='Date to start processing ticks after')
+    last_run_at = DateTimeField(description='Last time the task was run')
+
+    total_run_count = IntField(min_value=0, default=0, description='Number of times the task was executed')
+    max_run_count = IntField(min_value=0, default=0, description='Max number of times the task can run before expiring')
+
+    date_changed = DateTimeField(description='Last modification date')
+    run_immediately = BooleanField(description='Whether the task should run as soon as created?')
+

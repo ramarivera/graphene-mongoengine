@@ -6,15 +6,21 @@ name = "pypi"
 
 
 [packages]
+
 mongoengine = "*"
 graphene = "*"
 singledispatch = "*"
+pytest = "*"
+
 
 [dev-packages]
+
 rope = "*"
 pylint = "*"
 "flake8" = "*"
 sqlalchemy = "*"
+pytest = "*"
+
 
 [requires]
 
