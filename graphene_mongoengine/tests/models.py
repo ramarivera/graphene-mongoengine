@@ -23,7 +23,7 @@ class Interval(EmbeddedDocument):
     period = StringField(choices=PERIODS, description='Interval period')
 
 
-class PeriodicTask(DynamicDocument):
+class PeriodicTask(Document):
     """mongo database model that represents a periodic task"""
 
 

@@ -11,6 +11,8 @@ mongoengine = "*"
 graphene = "*"
 singledispatch = "*"
 pytest = "*"
+"iso8601" = "*"
+pytest-cov = "*"
 
 
 [dev-packages]

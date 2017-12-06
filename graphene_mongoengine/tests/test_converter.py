@@ -1,7 +1,8 @@
 from py.test import raises
 
 from graphene import (
-    String, Int, Boolean, Float, ID
+    String, Int, Boolean, Float, ID,
+    List, Dynamic
 )
 from graphene.relay import Node
 from graphene.types.datetime import DateTime
@@ -15,15 +16,37 @@ from ..registry import Registry
 from ..types import MongoEngineObjectType
 from .models import PeriodicTask
 
+DESCRIPTION_TEXT = 'Custom Help Text'
 
 def assert_field_conversion(mongoengine_field, graphene_field, **kwargs):
-    description_text = 'Custom Help Text'
-    field = mongoengine_field(description=description_text, **kwargs)
+    field = mongoengine_field(description=DESCRIPTION_TEXT, **kwargs)
     graphene_type = convert_mongoengine_field(field)
     assert isinstance(graphene_type, graphene_field)
     field = graphene_type.Field()
-    assert field.description == description_text
+    assert field.description == DESCRIPTION_TEXT
     return field
+ 
+def assert_list_field_conversion(list_type, mongoengine_field, graphene_field, **kwargs):
+    field = list_type(field=mongoengine_field, description=DESCRIPTION_TEXT, **kwargs)
+    graphene_type = convert_mongoengine_field(field)
+    assert isinstance(graphene_type, graphene_field)
+    field = graphene_type.Field()
+    assert field.description == DESCRIPTION_TEXT
+    return field
+
+
+def test_should_none_raise_exception():
+    with raises(Exception) as excinfo:
+        convert_mongoengine_field(None)
+    assert "Don't know how to convert the Mongoengine field" in str(excinfo.value)
+
+
+def test_should_not_mongoengine_field_raise_exception():
+    with raises(Exception) as excinfo:
+        convert_mongoengine_field(str)
+    assert "Don't know how to convert the Mongoengine field" in str(excinfo.value)
+    assert str(str) in str(excinfo.value)
+
 
 
 def test_should_objectid_convert_id():
@@ -42,6 +65,14 @@ def test_should_email_convert_string():
     assert_field_conversion(fields.EmailField, String)
 
 
+def test_should_uuid_convert_string():
+    assert_field_conversion(fields.UUIDField, String)
+
+
+def test_should_sequence_convert_string():
+    assert_field_conversion(fields.SequenceField, String)
+
+
 def test_should_datetime_convert_datetime():
     assert_field_conversion(fields.DateTimeField, DateTime)
 
@@ -54,8 +85,8 @@ def test_should_int_convert_int():
     assert_field_conversion(fields.IntField, Int)
 
 
-def test_should_long_convert_int():
-    assert_field_conversion(fields.LongField, Int)
+def test_should_long_convert_float():
+    assert_field_conversion(fields.LongField, Float)
 
 
 def test_should_boolean_convert_boolean():
@@ -110,3 +141,44 @@ def test_should_multipolygon_convert_jsonstring():
     assert_field_conversion(fields.MultiPolygonField, JSONString)
 
 
+def test_should_list_int_convert_list_int():
+    assert_list_field_conversion(fields.ListField, fields.IntField, List)
+
+
+def test_should_list_string_convert_list_string():
+    assert_list_field_conversion(fields.ListField, fields.StringField, List)
+
+
+def test_should_list_none_convert_list_string():
+    assert_list_field_conversion(fields.ListField, None, List)
+
+
+def test_should_sortedlist_int_convert_list_int():
+    assert_list_field_conversion(fields.SortedListField, fields.IntField, List)
+
+
+def test_should_sortedlist_string_convert_list_string():
+    assert_list_field_conversion(fields.SortedListField, fields.StringField, List)
+
+
+def test_should_sortedlist_none_convert_list_string():
+    assert_list_field_conversion(fields.SortedListField, None, List)
+
+
+"""@convert_mongoengine_type.register(ReferenceField)
+@convert_mongoengine_type.register(LazyReferenceField)
+@convert_mongoengine_type.register(CachedReferenceField)
+@convert_mongoengine_type.register(EmbeddedDocumentField)
+"""
+
+def assert_reference_field_conversion(reference_type, document_type, graphene_field, registry=None, **kwargs):
+    registry = registry or Registry()
+    field = reference_type(document_type, description=DESCRIPTION_TEXT, **kwargs)
+    graphene_type = convert_mongoengine_field(field, registry)
+    assert isinstance(graphene_type, graphene_field)
+    return graphene_type
+
+def test_should_unregistered_reference_field_convert_dynamic():
+    dynamic_field = assert_reference_field_conversion(fields.ReferenceField, PeriodicTask, Dynamic)
+    # assert field.description == DESCRIPTION_TEXT
+    assert not dynamic_field.get_type()

@@ -37,7 +37,7 @@ from .utils import (
 
 
 def convert_mongoengine_field(field, registry=None):
-    """ Shorcut method to :convert_mongoengine_type: """
+    """ Wrapper method for :convert_mongoengine_type: """
     return convert_mongoengine_type(field, registry)
 
 
@@ -131,36 +131,40 @@ def convert_field_to_jsonstring(field, registry=None):
 @convert_mongoengine_type.register(EmbeddedDocumentField)
 def convert_field_to_object(field, registry=None):
     """ Converts Mongoengine fields to Graphene Object type """
+    field_data = get_data_from_field(field)
 
     def type_factory():
         """ Lazy type factory """
         doc_type = registry.get_type_for_document(field.document_type)
         if not doc_type:
             return None
-        return Field(doc_type)
+        return Field(doc_type, **field_data)
 
     return Dynamic(type_factory)
 
 
 @convert_mongoengine_type.register(ListField)
 @convert_mongoengine_type.register(SortedListField)
-def convert_field_to_list(field, registry=None):
+def convert_field_to_list(list_field, registry=None):
     """ Converts Mongoengine fields to Graphene List type """
 
-    if field_is_document_list(field):
-        return convert_document_list(field, registry)
+    if field_is_document_list(list_field):
+        return convert_document_list(list_field, registry)
     else:
-        if field.field is None:
-            return List(String(**get_data_from_field(field)))
+        if list_field.field is None:
+            inner_type = String
         else:
-            return List(convert_mongoengine_field(field.field, registry))
+            inner_type = convert_mongoengine_field(list_field.field(), registry).__class__
+
+        return List(inner_type,  **get_data_from_field(list_field))
 
 
-def convert_document_list(field, registry=None):
+def convert_document_list(list_field, registry=None):
     """ Converts a MongoEngine List based field wrapping 
     a Document based field to a Graphene List or Connection Field
     """
-    document = field.field.document_type
+    document = list_field.field.document_type
+    field_data = get_data_from_field(list_field)
 
     def type_factory():
         """ Lazy type factory """
@@ -169,8 +173,8 @@ def convert_document_list(field, registry=None):
             return None
 
         if doc_type._meta.connection:
-            return create_connection_field(doc_type)
+            return create_connection_field(doc_type, **field_data)
 
-        return Field(List(doc_type))
+        return Field(List(doc_type), **field_data)
 
     return Dynamic(type_factory)

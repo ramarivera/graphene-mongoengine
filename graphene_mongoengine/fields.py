@@ -76,9 +76,9 @@ class MongoEngineConnectionField(ConnectionField):
 __connection_factory = MongoEngineConnectionField
 
 
-def create_connection_field(type):
+def create_connection_field(type, **kwargs):
     """ Creates a :MongoEngineConnectionField: for a given type"""
-    return __connection_factory(type)
+    return __connection_factory(type, **kwargs)
 
 
 def register_connection_field_factory(factory_method):
